@@ -5,6 +5,7 @@
 #include <limits>
 #include <set>
 #include <sys/time.h>
+#include <mpi.h>
 
 #define MAX_K 500
 #define MAX_N 10000
@@ -46,64 +47,102 @@ double point_dist(point a, point b){
 
 
 int main(int argc, char* argv[]){
-    int k, n, m;
-    double time_start, time_end;
+    int k, n, m, rank, size, root=0;
+    double time_start=cpuSecond(), time_end;
     set<point> clusters[MAX_K];
-
-    cin >> k;
-    cin >> n;
-    cin >> m;
-
     point points[MAX_N];
     point centroids[MAX_K];
 
+    MPI_Init(&argc, &argv);
 
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    /*numeric_limits<int>::min() e max() permettono di inizializzare il vettore min e max rispettivamente
-    con il valore minimo e massimo che un int può assumere, i vettori min e max memorizzano il valore minimo e massimo
-    assunto da una data coordinata nei vari punti in input, in modo da avere una generazione dei centroidi iniziali meno casuale*/
-    vector<double> max(m, numeric_limits<double>::min()), min(m, numeric_limits<double>::max());
-
-    //Inizializzazione punti
-    for(int i=0; i<n; i++){
-        point p(m);
-        for(int j=0; j<m; j++){
-            double in;
-            cin >> in;
-            p.at(j) = in;
-            points[i]=p;
-            if(in > max.at(j))
-                max.at(j)=in;
-            if(in < min.at(j))
-                min.at(j)=in;
-        }
+    if(rank==root){
+        cin >> k;
+        cin >> n;
+        cin >> m;
     }
 
+    MPI_Bcast(&k, 1, MPI_INT, root, MPI_COMM_WORLD);
+    MPI_Bcast(&n,1 ,MPI_INT, root,  MPI_COMM_WORLD);
+    MPI_Bcast(&m, 1, MPI_INT, root,  MPI_COMM_WORLD);
 
-    time_start=cpuSecond();
-    /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
-     che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
-    long seed=time_start;
-    srand48(seed);
     for(int i=0; i<k; i++){
-        point centroid(m);
-        for(int j=0; j<m; j++){
-            double coord_min=min.at(j), coord_max=max.at(j);
-            centroid.at(j)=(drand48()*(coord_max-coord_min))+coord_min;
-        }
-        centroids[i]=centroid;
+        centroids[i]=point(m);
     }
 
-    bool same_centroid = false;
-    while(!same_centroid){
+    int scatter_size=n/size, remainder;
+    remainder = n-scatter_size*size;
+    if(remainder==0)
+        remainder=scatter_size;
+
+    //La radice inizializza tutti i punti e i centroidi, dopodichè li distribuisce a tutti i nodi
+    if(rank==root){
+        /*numeric_limits<int>::min() e max() permettono di inizializzare il vettore min e max rispettivamente
+        con il valore minimo e massimo che un int può assumere, i vettori min e max memorizzano il valore minimo e massimo
+        assunto da una data coordinata nei vari punti in input, in modo da avere una generazione dei centroidi iniziali meno casuale*/
+        vector<double> max(m, numeric_limits<double>::min()), min(m, numeric_limits<double>::max());
+
+        //Inizializzazione punti
+        for(int i=0; i<n; i++){
+            point p(m);
+            for(int j=0; j<m; j++){
+                double in;
+                cin >> in;
+                p.at(j) = in;
+                points[i]=p;
+                if(in > max.at(j))
+                    max.at(j)=in;
+                if(in < min.at(j))
+                    min.at(j)=in;
+            }
+        }
+        /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
+         che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
+        for(int i=0; i<k; i++){
+            point centroid(m);
+            for(int j=0; j<m; j++){
+                double coord_min=min.at(j), coord_max=max.at(j);
+                centroid.at(j)=(drand48()*(coord_max-coord_min))+coord_min;
+            }
+            centroids[i]=centroid;
+        }
+
+        for(int dest=1; dest<size; dest++){
+            int start_point=remainder+(dest-1)*scatter_size, end_point;
+            end_point=start_point+scatter_size;
+            for(int i=start_point; i<end_point; i++){
+                MPI_Send(points[i].data(), m, MPI_DOUBLE, dest, 0, MPI_COMM_WORLD);
+            }
+        }
+    } else{
+        MPI_Status status;
+        for(int i=0; i<scatter_size; i++){
+            points[i]= point(m);
+            MPI_Recv(points[i].data(), m, MPI_DOUBLE, root, 0, MPI_COMM_WORLD, &status);
+        }
+    }
+
+    bool same_centroids=false;
+    int num_points;
+    if(rank==root)
+        num_points=remainder;
+    else
+        num_points=scatter_size;
+
+    while(!same_centroids){
+        same_centroids=true;
+
+        for(int cenIt=0; cenIt<k; cenIt++){
+            MPI_Bcast(centroids[cenIt].data(), m, MPI_DOUBLE, root, MPI_COMM_WORLD);
+        }
 
         for(int i=0; i<k; i++){
             clusters[i].clear();
         }
 
-        same_centroid = true;
-        //Calcolo il centroide più vicino per ogni punto
-        for(int pointIt=0; pointIt<n; pointIt++){
+        for(int pointIt=0; pointIt<num_points; pointIt++){
             //Riazzero distanza di confronto
             double min_dist=numeric_limits<double>::max();
             int nearest_centroid;
@@ -115,10 +154,11 @@ int main(int argc, char* argv[]){
                     nearest_centroid=cenIt;
                 }
             }
-            //Inserisco il punto nel cluster identificato dal centroide più vicino
             clusters[nearest_centroid].insert(points[pointIt]);
         }
-        //Ricalcolo centroidi
+
+        point local_new_centroids[MAX_K], global_new_centroids[MAX_K];
+
         for(int cenIt=0; cenIt<k; cenIt++){
             if(clusters[cenIt].size()!=0){
                 point new_centroid= point(m,0);
@@ -128,22 +168,54 @@ int main(int argc, char* argv[]){
                         point p=*it;
                         new_coord+=p.at(dim);
                     }
-                    new_coord/=clusters[cenIt].size();
                     new_centroid.at(dim)=new_coord;
                 }
-                if(!equal_points(new_centroid, centroids[cenIt])){
-                    centroids[cenIt]=new_centroid;
-                    same_centroid=false;
+                local_new_centroids[cenIt]=new_centroid;
+            }
+            else{
+                local_new_centroids[cenIt]=point(m,0);
+            }
+        }
+
+        int local_clusters_size[MAX_K], global_clusters_size[MAX_K];
+
+        for(int cluster=0; cluster<k; cluster++){
+            local_clusters_size[cluster]=clusters[cluster].size();
+        }
+
+        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
+
+        for(int centroid=0; centroid<k; centroid++){
+            global_new_centroids[centroid]=point(m,0);
+            MPI_Reduce(local_new_centroids[centroid].data(), global_new_centroids[centroid].data(), m, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            if(rank==root && global_clusters_size[centroid]>0){
+                for(int coord=0; coord<m; coord++){
+                    global_new_centroids[centroid].at(coord)/=global_clusters_size[centroid];
                 }
             }
         }
+
+        if(rank==root){
+            for(int centroid=0; centroid<k; centroid++){
+                if(!equal_points(global_new_centroids[centroid], centroids[centroid])){
+                    same_centroids=false;
+                    centroids[centroid]=global_new_centroids[centroid];
+                }
+            }
+        }
+
+        MPI_Bcast(&same_centroids, 1, MPI_C_BOOL, root, MPI_COMM_WORLD);
     }
 
-    for(int i=0; i<k; i++){
-        print_point(centroids[i]);
+    MPI_Finalize();
+
+    if(rank==root){
+
+        for(int i=0; i<k; i++){
+            print_point(centroids[i]);
+        }
+
+        time_end=cpuSecond();
+        cout << "Time: "<<time_end-time_start<<endl;
     }
-
-    time_end=cpuSecond();
-    cout << "Time: "<<time_end-time_start<<endl;
-
 }
