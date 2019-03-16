@@ -1,7 +1,6 @@
 #include <iostream>
 #include <stdlib.h>
 #include <fstream>
-#include <string.h>
 #include <sys/time.h>
 
 using namespace std;
@@ -9,11 +8,7 @@ using namespace std;
 int main(int argc, char* argv[]){
 
     int k, n, m;
-    char name[20];
-
-    cout << "File name: ";
-    cin >> name;
-    ofstream File(name);
+    ofstream File("points-generated.txt");
 
     cout << "Centroids: ";
     cin >> k;

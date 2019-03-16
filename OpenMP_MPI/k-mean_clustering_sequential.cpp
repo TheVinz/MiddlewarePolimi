@@ -52,14 +52,10 @@ int main(int argc, char* argv[]){
     int k, n, m;
     double time_start, time_end;
 
-    ifstream File("points-generated.txt");
 
-    File >> k;
-    cout << "Centroids: "  << k << endl;
-    File >> n;
-    cout << "Points: " << n << endl;
-    File >> m;
-    cout << "Dimensions: "<< m << endl << endl;
+    cin >> k;
+    cin >> n;
+    cin >> m;
 
     point points[MAX_N];
     point centroids[MAX_K];
@@ -77,7 +73,7 @@ int main(int argc, char* argv[]){
         point p(m);
         for(int j=0; j<m; j++){
             double in;
-            File >> in;
+            cin >> in;
             p.at(j) = in;
             //TODO assegnamento sotto può andare fuori dal ciclo interno?
             points[i]=p;
@@ -88,17 +84,9 @@ int main(int argc, char* argv[]){
         }
     }
 
-    cout << "Points list:" << endl;
-    for(int i=0; i<n; i++){
-        print_point(points[i]);
-    }
-    cout << endl << endl;
-
     time_start=cpuSecond();
     /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
      che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
-    long seed=time_start;
-    srand48(seed);
 
     //Inizializzazione della dimensione dei centroidi per permetter il collapse al ciclo dopo
     for(int i=0; i<k; i++){
@@ -164,7 +152,6 @@ int main(int argc, char* argv[]){
         }
     }
 
-    cout << "Final centroids:" << endl;
     for(int i=0; i<k; i++){
         print_point(centroids[i]);
     }

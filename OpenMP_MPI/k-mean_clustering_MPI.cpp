@@ -9,7 +9,7 @@
 
 #define MAX_K 500
 #define MAX_N 10000
-#define MAX_M 10000
+#define MAX_M 100
 
 
 using namespace std;
@@ -199,7 +199,8 @@ int main(int argc, char* argv[]){
             for(int centroid=0; centroid<k; centroid++){
                 if(!equal_points(global_new_centroids[centroid], centroids[centroid])){
                     same_centroids=false;
-                    centroids[centroid]=global_new_centroids[centroid];
+                    if(global_clusters_size[centroid]!=0)
+                        centroids[centroid]=global_new_centroids[centroid];
                 }
             }
         }
