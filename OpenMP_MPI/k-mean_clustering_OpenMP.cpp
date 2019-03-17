@@ -129,7 +129,6 @@ int main(int argc, char* argv[]){
         same_centroid = true;
 
         //Calcolo il centroide più vicino per ogni punto
-        //TODO si blocca quando uso OpenMP qui
         chunkSize = n / omp_get_max_threads();
         #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int pointIt=0; pointIt<n; pointIt++){
@@ -147,7 +146,7 @@ int main(int argc, char* argv[]){
             //Inserisco il punto nel cluster identificato dal centroide più vicino
             #pragma omp critical
             {
-            clusters[nearest_centroid].insert(points[pointIt]);
+                clusters[nearest_centroid].insert(points[pointIt]);
             }
         }
 
