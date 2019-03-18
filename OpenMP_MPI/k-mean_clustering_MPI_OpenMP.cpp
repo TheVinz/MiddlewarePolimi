@@ -86,6 +86,8 @@ int main(int argc, char* argv[]){
         assunto da una data coordinata nei vari punti in input, in modo da avere una generazione dei centroidi iniziali meno casuale*/
         vector<double> max(m, numeric_limits<double>::min()), min(m, numeric_limits<double>::max());
 
+        int dest, cont = 0;
+
         //Inizializzazione punti
         for(int i=0; i<n; i++){
             point p(m);
@@ -190,7 +192,7 @@ int main(int argc, char* argv[]){
                     double new_coord=0;
                     for(set<point>::iterator it=clusters[cenIt].begin(); it!=clusters[cenIt].end(); ++it){
                         point p=*it;
-                        new_coord+=p.at(dim)/global_cluster_size[cenIt];
+                        new_coord+=p.at(dim)/global_clusters_size[cenIt];
                     }
                     new_centroid.at(dim)=new_coord;
                 }

@@ -128,6 +128,8 @@ int main(int argc, char* argv[]){
         }
         same_centroid = true;
 
+
+        set<point> threadClusters[omp_get_max_threads()][MAX_K];
         //Calcolo il centroide più vicino per ogni punto
         chunkSize = n / omp_get_max_threads();
         #pragma omp parallel for schedule (dynamic, chunkSize)
@@ -143,10 +145,18 @@ int main(int argc, char* argv[]){
                     nearest_centroid=cenIt;
                 }
             }
-            //Inserisco il punto nel cluster identificato dal centroide più vicino
-            #pragma omp critical
-            {
-                clusters[nearest_centroid].insert(points[pointIt]);
+            //Inserisco il punto nel cluster identificato dal centroide più vicino nel vettore del thread corrispondente
+            threadClusters[omp_get_thread_num()][nearest_centroid].insert(points[pointIt]);
+        }
+
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
+        for(int cenIt=0; cenIt<k; cenIt++){
+            for(int i=0; i<omp_get_max_threads(); i++){
+                for(set<point>::iterator it=threadClusters[i][cenIt].begin(); it!=threadClusters[i][cenIt].end(); ++it){
+                        point p=*it;
+                        clusters[cenIt].insert(p);
+                    }
             }
         }
 
@@ -182,6 +192,7 @@ int main(int argc, char* argv[]){
     }
 
     time_end=cpuSecond();
+
     cout << "Time: "<<time_end-time_start<<endl;
 
 }
