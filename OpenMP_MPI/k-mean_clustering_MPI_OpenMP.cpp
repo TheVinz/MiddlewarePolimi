@@ -6,6 +6,7 @@
 #include <set>
 #include <sys/time.h>
 #include <mpi.h>
+#include <omp.h>
 
 #define MAX_K 500
 #define MAX_N 10000
@@ -45,11 +46,13 @@ double point_dist(point a, point b){
     return sqrt(result);
 }
 
+
 int main(int argc, char* argv[]){
-    int k, n, m, rank, size, root=0;
+    int k, n, m, rank, size, root=0, chunkSize;
     double time_start=cpuSecond(), time_end;
     set<point> clusters[MAX_K];
-    point points[MAX_N], centroids[MAX_K];
+    point points[MAX_N];
+    point centroids[MAX_K];
 
     MPI_Init(&argc, &argv);
 
@@ -66,6 +69,8 @@ int main(int argc, char* argv[]){
     MPI_Bcast(&n,1 ,MPI_INT, root,  MPI_COMM_WORLD);
     MPI_Bcast(&m, 1, MPI_INT, root,  MPI_COMM_WORLD);
 
+    chunkSize = k / omp_get_max_threads();
+    #pragma omp parallel for schedule (dynamic, chunkSize)
     for(int i=0; i<k; i++){
         centroids[i]=point(m);
     }
@@ -76,9 +81,10 @@ int main(int argc, char* argv[]){
 
     //La radice inizializza tutti i punti e i centroidi, dopodichè li distribuisce a tutti i nodi
     if(rank==root){
+        /*numeric_limits<int>::min() e max() permettono di inizializzare il vettore min e max rispettivamente
+        con il valore minimo e massimo che un int può assumere, i vettori min e max memorizzano il valore minimo e massimo
+        assunto da una data coordinata nei vari punti in input, in modo da avere una generazione dei centroidi iniziali meno casuale*/
         vector<double> max(m, numeric_limits<double>::min()), min(m, numeric_limits<double>::max());
-
-        int dest, cont=0;
 
         //Inizializzazione punti
         for(int i=0; i<n; i++){
@@ -101,15 +107,24 @@ int main(int argc, char* argv[]){
             }
         }
 
+
+        //Inizializzazione della dimensione dei centroidi per permetter il collapse al ciclo dopo
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int i=0; i<k; i++){
             point centroid(m);
+            centroids[i] = centroid;
+        }
+        /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
+         che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
+        chunkSize = k*m / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize) collapse (2)
+        for(int i=0; i<k; i++){
             for(int j=0; j<m; j++){
                 double coord_min=min.at(j), coord_max=max.at(j);
-                centroid.at(j)=(drand48()*(coord_max-coord_min))+coord_min;
+                centroids[i].at(j)=(drand48()*(coord_max-coord_min))+coord_min;
             }
-            centroids[i]=centroid;
         }
-
     } else{
         MPI_Status status;
         for(int i=0; i<num_points; i++){
@@ -127,13 +142,16 @@ int main(int argc, char* argv[]){
             MPI_Bcast(centroids[cenIt].data(), m, MPI_DOUBLE, root, MPI_COMM_WORLD);
         }
 
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int i=0; i<k; i++){
             clusters[i].clear();
         }
 
         int local_clusters_size[MAX_K], global_clusters_size[MAX_K];
 
-
+        chunkSize = num_points / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int pointIt=0; pointIt<num_points; pointIt++){
             //Riazzero distanza di confronto
             double min_dist=numeric_limits<double>::max();
@@ -146,11 +164,16 @@ int main(int argc, char* argv[]){
                     nearest_centroid=cenIt;
                 }
             }
-            clusters[nearest_centroid].insert(points[pointIt]);
+            #pragma omp critical
+            {
+                clusters[nearest_centroid].insert(points[pointIt]);
+            }
         }
 
-        for(int i=0; i<k; i++){
-            local_clusters_size[i]=clusters[i].size();
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
+        for(int cluster=0; cluster<k; cluster++){
+            local_clusters_size[cluster]=clusters[cluster].size();
         }
 
         MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
@@ -158,6 +181,8 @@ int main(int argc, char* argv[]){
 
         point local_new_centroids[MAX_K], global_new_centroids[MAX_K];
 
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int cenIt=0; cenIt<k; cenIt++){
             if(clusters[cenIt].size()!=0){
                 point new_centroid= point(m,0);
@@ -165,7 +190,7 @@ int main(int argc, char* argv[]){
                     double new_coord=0;
                     for(set<point>::iterator it=clusters[cenIt].begin(); it!=clusters[cenIt].end(); ++it){
                         point p=*it;
-                        new_coord+=p.at(dim)/global_clusters_size[cenIt];
+                        new_coord+=p.at(dim)/global_cluster_size[cenIt];
                     }
                     new_centroid.at(dim)=new_coord;
                 }
@@ -176,16 +201,29 @@ int main(int argc, char* argv[]){
             }
         }
 
+        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
 
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int centroid=0; centroid<k; centroid++){
             global_new_centroids[centroid]=point(m,0);
             MPI_Reduce(local_new_centroids[centroid].data(), global_new_centroids[centroid].data(), m, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            if(rank==root && global_clusters_size[centroid]>0){
+                for(int coord=0; coord<m; coord++){
+                    global_new_centroids[centroid].at(coord)/=global_clusters_size[centroid];
+                }
+            }
         }
 
         if(rank==root){
+            chunkSize = k / omp_get_max_threads();
+            #pragma omp parallel for schedule (dynamic, chunkSize) shared(same_centroids)
             for(int centroid=0; centroid<k; centroid++){
                 if(!equal_points(global_new_centroids[centroid], centroids[centroid])){
-                    same_centroids=false;
+                    #pragma critical
+                    {
+                        same_centroids=false;
+                    }
                     if(global_clusters_size[centroid]!=0)
                         centroids[centroid]=global_new_centroids[centroid];
                 }
