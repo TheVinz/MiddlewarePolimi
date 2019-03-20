@@ -9,6 +9,11 @@
 #include <omp.h>
 
 
+#define MAX_K 500
+#define MAX_N 10000
+#define MAX_M 10000
+
+
 using namespace std;
 
 typedef vector<double> point;
@@ -48,15 +53,18 @@ int main(int argc, char* argv[]){
     int chunkSize;
     double time_start, time_end;
 
+    ifstream File("points-generated.txt");
 
-    cin >> k;
-    cin >> n;
-    cin >> m;
+    File >> k;
+    cout << "Centroids: "  << k << endl;
+    File >> n;
+    cout << "Points: " << n << endl;
+    File >> m;
+    cout << "Dimensions: "<< m << endl << endl;
 
-    point points[n];
-    point centroids[k];
-    set<point> clusters[k];
-
+    point points[MAX_N];
+    point centroids[MAX_K];
+    set<point> clusters[MAX_K];
 
 
 
@@ -70,29 +78,36 @@ int main(int argc, char* argv[]){
         point p(m);
         for(int j=0; j<m; j++){
             double in;
-            cin >> in;
+            File >> in;
             p.at(j) = in;
+            //TODO assegnamento sotto può andare fuori dal ciclo interno?
+            points[i]=p;
             if(in > max.at(j))
                 max.at(j)=in;
             if(in < min.at(j))
                 min.at(j)=in;
         }
-        points[i]=p;
     }
+
+    cout << "Points list:" << endl;
+    for(int i=0; i<n; i++){
+        print_point(points[i]);
+    }
+    cout << endl << endl;
 
     time_start=cpuSecond();
     /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
      che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
+    long seed=time_start;
+    srand48(seed);
 
     //Inizializzazione della dimensione dei centroidi per permetter il collapse al ciclo dopo
-    /*for(int i=0; i<k; i++){
-        point centroid(m);
-        centroids[i] = centroid;
-    }*/
-
     for(int i=0; i<k; i++){
         point centroid(m);
         centroids[i] = centroid;
+    }
+
+    for(int i=0; i<k; i++){
         for(int j=0; j<m; j++){
             double coord_min=min.at(j), coord_max=max.at(j);
             centroids[i].at(j)=(drand48()*(coord_max-coord_min))+coord_min;
@@ -109,9 +124,6 @@ int main(int argc, char* argv[]){
 
 
         //Calcolo il centroide più vicino per ogni punto
-        set<point> threadClusters[omp_get_max_threads()][k];
-        chunkSize = n / omp_get_max_threads();
-        #pragma omp parallel for schedule(dynamic, chunkSize)
         for(int pointIt=0; pointIt<n; pointIt++){
             //Riazzero distanza di confronto
             double min_dist = numeric_limits<double>::max();
@@ -125,23 +137,12 @@ int main(int argc, char* argv[]){
                 }
             }
             //Inserisco il punto nel cluster identificato dal centroide più vicino nel vettore del thread corrispondente
-            threadClusters[omp_get_thread_num()][nearest_centroid].insert(points[pointIt]);
+            clusters[nearest_centroid].insert(points[pointIt]);
         }
 
-        chunkSize = k / omp_get_max_threads();
-        #pragma omp parallel for schedule(dynamic, chunkSize)
-        for(int cenIt=0; cenIt<k; cenIt++){
-            for(int i=0; i<omp_get_max_threads(); i++){
-                for(set<point>::iterator it=threadClusters[i][cenIt].begin(); it!=threadClusters[i][cenIt].end(); ++it){
-                        point p=*it;
-                        clusters[cenIt].insert(p);
-                    }
-            }
-        }
+
 
         //Ricalcolo centroidi
-        chunkSize = k / omp_get_max_threads();
-        #pragma omp parallel for schedule(dynamic, chunkSize)
         for(int cenIt=0; cenIt<k; cenIt++){
 
             if(clusters[cenIt].size()!=0){
@@ -165,6 +166,7 @@ int main(int argc, char* argv[]){
         }
     }
 
+    cout << "Final centroids:" << endl;
     for(int i=0; i<k; i++){
         print_point(centroids[i]);
     }

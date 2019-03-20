@@ -69,8 +69,6 @@ int main(int argc, char* argv[]){
     MPI_Bcast(&n,1 ,MPI_INT, root,  MPI_COMM_WORLD);
     MPI_Bcast(&m, 1, MPI_INT, root,  MPI_COMM_WORLD);
 
-    chunkSize = k / omp_get_max_threads();
-    #pragma omp parallel for schedule (dynamic, chunkSize)
     for(int i=0; i<k; i++){
         centroids[i]=point(m);
     }
@@ -111,17 +109,16 @@ int main(int argc, char* argv[]){
 
 
         //Inizializzazione della dimensione dei centroidi per permetter il collapse al ciclo dopo
-        chunkSize = k / omp_get_max_threads();
-        #pragma omp parallel for schedule (dynamic, chunkSize)
+        /*for(int i=0; i<k; i++){
+            point centroid(m);
+            centroids[i] = centroid;
+        }*/
+
+        /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
+         che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
         for(int i=0; i<k; i++){
             point centroid(m);
             centroids[i] = centroid;
-        }
-        /*Inizializzazione centroidi random: le coordinate dei centroid sono numeri casuali
-         che variano tra il minimo valore assunto da quella coordinata dai punti e il massimo*/
-        chunkSize = k*m / omp_get_max_threads();
-        #pragma omp parallel for schedule (dynamic, chunkSize) collapse (2)
-        for(int i=0; i<k; i++){
             for(int j=0; j<m; j++){
                 double coord_min=min.at(j), coord_max=max.at(j);
                 centroids[i].at(j)=(drand48()*(coord_max-coord_min))+coord_min;
@@ -144,16 +141,16 @@ int main(int argc, char* argv[]){
             MPI_Bcast(centroids[cenIt].data(), m, MPI_DOUBLE, root, MPI_COMM_WORLD);
         }
 
-        chunkSize = k / omp_get_max_threads();
-        #pragma omp parallel for schedule (dynamic, chunkSize)
         for(int i=0; i<k; i++){
             clusters[i].clear();
         }
 
         int local_clusters_size[MAX_K], global_clusters_size[MAX_K];
 
-        chunkSize = num_points / omp_get_max_threads();
-        #pragma omp parallel for schedule (dynamic, chunkSize)
+        //Calcolo il centroide più vicino per ogni punto
+        set<point> threadClusters[omp_get_max_threads()][k];
+        chunkSize = n / omp_get_max_threads();
+        #pragma omp parallel for schedule(dynamic, chunkSize)
         for(int pointIt=0; pointIt<num_points; pointIt++){
             //Riazzero distanza di confronto
             double min_dist=numeric_limits<double>::max();
@@ -166,11 +163,20 @@ int main(int argc, char* argv[]){
                     nearest_centroid=cenIt;
                 }
             }
-            #pragma omp critical
-            {
-                clusters[nearest_centroid].insert(points[pointIt]);
+            threadClusters[omp_get_thread_num()][nearest_centroid].insert(points[pointIt]);
+        }
+
+        chunkSize = k / omp_get_max_threads();
+        #pragma omp parallel for schedule(dynamic, chunkSize)
+        for(int cenIt=0; cenIt<k; cenIt++){
+            for(int i=0; i<omp_get_max_threads(); i++){
+                for(set<point>::iterator it=threadClusters[i][cenIt].begin(); it!=threadClusters[i][cenIt].end(); ++it){
+                        point p=*it;
+                        clusters[cenIt].insert(p);
+                    }
             }
         }
+
 
         chunkSize = k / omp_get_max_threads();
         #pragma omp parallel for schedule (dynamic, chunkSize)
@@ -219,13 +225,10 @@ int main(int argc, char* argv[]){
 
         if(rank==root){
             chunkSize = k / omp_get_max_threads();
-            #pragma omp parallel for schedule (dynamic, chunkSize) shared(same_centroids)
+            #pragma omp parallel for schedule (dynamic, chunkSize)
             for(int centroid=0; centroid<k; centroid++){
                 if(!equal_points(global_new_centroids[centroid], centroids[centroid])){
-                    #pragma critical
-                    {
-                        same_centroids=false;
-                    }
+                    same_centroids=false;
                     if(global_clusters_size[centroid]!=0)
                         centroids[centroid]=global_new_centroids[centroid];
                 }
