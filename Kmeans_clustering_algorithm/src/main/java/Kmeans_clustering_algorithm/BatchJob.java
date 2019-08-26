@@ -23,6 +23,8 @@ import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.IterativeDataSet;
@@ -53,9 +55,9 @@ public class BatchJob {
 	public static void main(String[] args) throws Exception {
 
 		final ParameterTool params = ParameterTool.fromArgs(args);
-		final String filename = params.get("filename", null);
-		final String output = params.get("output", null);
-		final int iterations = params.getInt("iterations", 0);
+		final String filename = params.get("filename", null);   //Path to the file with Data
+		final String output = params.get("output", null);   //Path to the output file for result
+		final int iterations = params.getInt("iterations", 0);  //Max iterations set by User
 
 		if(filename == null) {
 			throw new RequiredParametersException
@@ -71,19 +73,17 @@ public class BatchJob {
 		}
 
 		Data data = new Data();
-
-		readData(data, filename);
-
-		data.createCentroidsAndClusters();
+		readData(data, filename);   //Function to read Data from the file
+        data.createCentroidsAndClusters(); //Creation of random Centroid and relatives clusters
 
 		final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+		env.setRestartStrategy(RestartStrategies.fixedDelayRestart(10,5));
 
 		DataSet<Point> points = env.fromCollection(data.getPoints());
 
-		DataSet<Cluster> clusters = env.fromCollection(data.getClusters());
-		DataSet<Cluster> clusterDataSet = env.fromCollection(data.getClusters());
+		DataSet<Cluster> clustersDataSet = env.fromCollection(data.getClusters());
 
-		IterativeDataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusterLoop = clusterDataSet.map(new ComputeTupleFromCluster()).iterate(iterations);
+		IterativeDataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusterLoop = clustersDataSet.map(new ComputeTupleFromCluster()).iterate(iterations);
 
 		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> newClusters = clusterLoop
                 .map(new UpdateClusters())
@@ -100,62 +100,14 @@ public class BatchJob {
 		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> finalClusters = clusterLoop.closeWith(newClusters, termination);
 
 		DataSet<Cluster> result = finalClusters
-                .map(new ComputeNewClusters()).withBroadcastSet(clusters, "clusters");
+                .sortPartition(0, Order.ASCENDING)
+                .map(new ComputeNewClusters());
 
-		for(Tuple4<Integer, Point, Boolean, Vector<Point>> cluster : finalClusters.collect()){
-		    System.out.println("\nCluster: " + cluster.f0);
-		    System.out.println("Centroid: " + cluster.f1.getCoordinates());
-		    System.out.println("Changed: " + cluster.f2);
-		    System.out.println("Points:");
-		    for(Point point : cluster.f3) {
-		        System.out.println(point.getCoordinates());
-            }
+		printResult(result);
+
+		if(output != null){
+		    printResultOnOutput(result, output, points, clustersDataSet);
         }
-
-        System.out.print("\n\n");
-		for(Cluster cluster : result.collect()){
-		    System.out.println("Cluster" +
-                    "\nid:" + cluster.getId() +
-                    "\nCentroid: " + cluster.getCentroidCoordinates() +
-                    "\nNumber of points: " + cluster.getPoints().size());
-            System.out.print("\n");
-        }
-        System.out.print("\n");
-
-        if(output != null){
-            FileWriter fw = new FileWriter(output);
-            BufferedWriter bw = new BufferedWriter(fw);
-            PrintWriter out = new PrintWriter(bw);
-
-            out.println("Points:");
-            for(Point point : points.collect()){
-                out.println(point.getCoordinates());
-            }
-
-            out.println("\nRandom Centroids:");
-            for(Cluster cluster : clusterDataSet.collect()){
-                out.println(cluster.getCentroidCoordinates());
-            }
-
-            out.println("\n\n========= RESULTS =========");
-            out.println("\nFinal Clusters");
-            for(Cluster cluster : result.collect()){
-                out.println("\nCluster id: " + cluster.getId());
-                out.println("Centroid: " + cluster.getCentroidCoordinates());
-                out.println("Number of points: " + cluster.getPoints().size());
-                out.println("Points:");
-                for(Point point : cluster.getPoints()){
-                    out.println(point.getCoordinates());
-                }
-            }
-
-            out.close();
-            bw.close();
-            fw.close();
-
-        }
-
-
 
 	}
 
@@ -222,6 +174,50 @@ public class BatchJob {
 
 	}
 
+	private static void printResult (DataSet<Cluster> result) throws Exception{
+
+        for(Cluster cluster : result.collect()){
+            System.out.println(
+                    "\nCluster id: " + cluster.getId() +
+                    "\nCentroid: " + cluster.getCentroidCoordinates() +
+                    "\nNumber of points: " + cluster.getPoints().size());
+        }
+        System.out.println("\n");
+    }
+
+    private static void printResultOnOutput (DataSet<Cluster> result, String output, DataSet<Point> points, DataSet<Cluster> initialClusters) throws Exception{
+
+	    FileWriter fw = new FileWriter(output);
+        BufferedWriter bw = new BufferedWriter(fw);
+        PrintWriter out = new PrintWriter(bw);
+
+        out.println("Points:");
+        for(Point point : points.collect()){
+            out.println(" " + point.getCoordinates());
+        }
+
+        out.println("\nRandom Centroids:");
+        for(Cluster cluster : initialClusters.collect()){
+            out.println(" " + cluster.getCentroidCoordinates());
+        }
+
+        out.println("\n\n========= RESULTS =========");
+        out.println("\nFinal Clusters");
+        for(Cluster cluster : result.collect()){
+            out.println("\nCluster id: " + cluster.getId());
+            out.println("Centroid: " + cluster.getCentroidCoordinates());
+            out.println("Number of points: " + cluster.getPoints().size());
+            out.println("Points:");
+            for(Point point : cluster.getPoints()){
+                out.println(" " + point.getCoordinates());
+            }
+        }
+
+        out.close();
+        bw.close();
+        fw.close();
+    }
+
 	public static final class FindNearestCentroid extends RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>> {
 		private Collection<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusters;
 
@@ -269,29 +265,14 @@ public class BatchJob {
         }
     }
 
-	public static final class ComputeNewClusters extends RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>{
-
-        private Collection<Cluster> clusters;
-
-        @Override
-        public void open(Configuration parameters) {
-            this.clusters = getRuntimeContext().getBroadcastVariable("clusters");
-        }
-
+	public static final class ComputeNewClusters implements MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>{
 	    @Override
-        public Cluster map(Tuple4<Integer, Point, Boolean, Vector<Point>> value) throws Exception {
-            for(Cluster cluster : clusters){
-                if(cluster.getId() == value.f0){
-
-                    cluster.setCentroidCoordinates(value.f1.getCoordinates());
-                    cluster.clearPoints();
-                    for(Point point : value.f3) cluster.addPoint(point);
-                    return cluster;
-                }
-            }
-            throw new Exception("Error while computing Clusters");
-        }
-    }
+        public Cluster map(Tuple4<Integer, Point, Boolean, Vector<Point>> value)    {
+	        Cluster cluster = new Cluster(value.f0, value.f1.getCoordinates());
+	        cluster.setPoints(value.f3);
+	        return cluster;
+	    }
+	}
 
 
 	public static final class UpdateClusters extends   RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
