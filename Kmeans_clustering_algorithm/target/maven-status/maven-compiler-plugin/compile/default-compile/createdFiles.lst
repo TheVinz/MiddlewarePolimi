@@ -1,0 +1,11 @@
+Kmeans_clustering_algorithm\BatchJob$UpdateClusters.class
+Kmeans_clustering_algorithm\BatchJob$ComputeTupleFromCluster.class
+Kmeans_clustering_algorithm\BatchJob.class
+Kmeans_clustering_algorithm\BatchJob$AverageCoordinates.class
+Kmeans_clustering_algorithm\BatchJob$FindNearestCentroid.class
+Kmeans_clustering_algorithm\BatchJob$OnlyChanged.class
+Kmeans_clustering_algorithm\Cluster.class
+Kmeans_clustering_algorithm\BatchJob$ComputeNewClusters.class
+Kmeans_clustering_algorithm\Data.class
+Kmeans_clustering_algorithm\Point.class
+Kmeans_clustering_algorithm\BatchJob$SumCoordinatesAndPoints.class
