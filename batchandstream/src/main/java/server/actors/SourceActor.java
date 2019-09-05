@@ -3,7 +3,7 @@ package main.java.server.actors;
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import main.java.server.source.Source;
+import main.java.server.node.Source;
 import main.java.server.message.EndMessage;
 import main.java.common.pair.Pair;
 

@@ -1,5 +1,7 @@
 package main.java.common.graph;
 
+import com.google.gson.JsonObject;
+
 import java.io.Serializable;
 
 public class Graph implements Serializable {
@@ -11,6 +13,10 @@ public class Graph implements Serializable {
 
     public SourceNode getSourceNode() {
         return sourceNode;
+    }
+
+    public JsonObject toJson(){
+        return new JsonGraphBuilder().buildJson(this);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package main.java.server.source;
+package main.java.server.node;
 
 import main.java.common.pair.Pair;
 
@@ -38,5 +38,9 @@ public class Source {
     public synchronized void close() {
         this.isClosed = true;
         notifyAll();
+    }
+
+    public int getQueueSize(){
+        return pairs.size();
     }
 }

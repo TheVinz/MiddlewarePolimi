@@ -1,10 +1,14 @@
 package main.java.server.app;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import main.java.common.graph.Graph;
 import main.java.common.pair.Pair;
-import main.java.server.source.Source;
+import main.java.server.node.Sink;
+import main.java.server.node.Source;
 import spark.Spark;
 
 import java.util.List;
@@ -14,11 +18,13 @@ public class App {
     private final Source source;
     private final Graph graph;
     private final static Gson gson = new Gson();
+    private final Sink sink;
 
 
-    public App(Source source, Graph graph) {
+    public App(Source source, Sink sink, Graph graph) {
         this.source = source;
         this.graph = graph;
+        this.sink = sink;
     }
 
     public void init() {
@@ -46,7 +52,13 @@ public class App {
         Spark.get("/status", ((request, response) -> {
             response.type("application/json");
             response.status(200);
-            return graph.toString();
+            return gson.toJson(getStatus(true));
+        }));
+
+        Spark.get("/status/no_output", ((request, response) -> {
+            response.type("application/json");
+            response.status(200);
+            return gson.toJson(getStatus(false));
         }));
 
         Spark.post("/stop", ((request, response) -> {
@@ -57,6 +69,19 @@ public class App {
     }
 
     public void close(){
+        sink.close();
         Spark.stop();
+    }
+
+    private JsonObject getStatus(boolean isOutput){
+        JsonObject res = new JsonObject();
+        JsonElement graph = this.graph.toJson();
+        if(isOutput) {
+            JsonElement output = sink.getCurrentOutput();
+            res.add("Output", output);
+        }
+        res.addProperty("Elements still to be processed", source.getQueueSize());
+        res.add("Current instantiated graph", graph);
+        return res;
     }
 }

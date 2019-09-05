@@ -2,7 +2,7 @@ package main.java.server.actors;
 
 import akka.actor.AbstractActor;
 import akka.actor.Props;
-import main.java.common.interfaces.Sink;
+import main.java.server.node.Sink;
 import main.java.server.message.EndMessage;
 import main.java.common.pair.Pair;
 

@@ -11,6 +11,10 @@ public class JsonGraphBuilder {
         return gson.toJson(build(graph.getSourceNode()));
     }
 
+    public JsonObject buildJson(Graph graph){
+        return build(graph.getSourceNode());
+    }
+
     JsonObject build(SourceNode node){
         JsonObject json = new JsonObject();
         json.addProperty("type", "Source operator");

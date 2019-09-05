@@ -3,21 +3,14 @@ package main.java.common.graph;
 import akka.actor.ActorRef;
 import com.google.gson.JsonObject;
 import main.java.server.actors.Supervisor;
-import main.java.common.interfaces.Sink;
 
 import java.util.List;
 
 public class SinkNode extends Node {
 
-    private final Sink sink;
 
-    public SinkNode(Sink sink) {
+    public SinkNode() {
         super(1);
-        this.sink = sink;
-    }
-
-    public Sink getSink() {
-        return sink;
     }
 
     @Override

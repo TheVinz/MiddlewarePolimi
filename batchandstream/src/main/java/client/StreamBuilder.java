@@ -5,6 +5,7 @@ import com.typesafe.config.ConfigFactory;
 import main.java.common.graph.*;
 import main.java.common.interfaces.*;
 import com.typesafe.config.Config;
+import main.java.server.node.Sink;
 
 
 import java.io.File;
@@ -31,11 +32,11 @@ public class StreamBuilder {
         boolean flag = false;
         Node n = graph.getSourceNode();
         while(n.getNext() != null) {
+            n=n.getNext();
             if(n instanceof SplitNode)
                 flag = true;
             else if (n instanceof MergeNode)
                 flag = false;
-            n = n.getNext();
         }
         if(flag)
             n.setNext(node);
@@ -46,12 +47,12 @@ public class StreamBuilder {
     private void addNode(SinkNode node) {
         boolean flag = true;
         Node n = graph.getSourceNode();
-        while(n.getNext() != null) {
+        while(n.getNext()!= null) {
+            n = n.getNext();
             if(n instanceof SplitNode)
                 flag = false;
             else if (n instanceof MergeNode)
                 flag = true;
-            n = n.getNext();
         }
         if(flag)
             n.setNext(node);
@@ -139,8 +140,8 @@ public class StreamBuilder {
         return this;
     }
 
-    public StreamBuilder putSink(Sink sink) {
-        SinkNode node = new SinkNode(sink);
+    public StreamBuilder putSink() {
+        SinkNode node = new SinkNode();
         addNode(node);
         ok = true;
         return this;

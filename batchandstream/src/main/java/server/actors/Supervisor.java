@@ -6,7 +6,8 @@ import main.java.common.graph.*;
 import main.java.server.app.App;
 import main.java.server.message.EndMessage;
 import main.java.common.graph.Graph;
-import main.java.server.source.Source;
+import main.java.server.node.Sink;
+import main.java.server.node.Source;
 import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class Supervisor extends AbstractActor {
     private int lastLayerSize = 0;
     private Source source;
     private App app;
+    private Sink sink = null;
 
     private List<ActorRef> instantiateOperator(Node node){
         return node.instantiate(this);
@@ -90,7 +92,7 @@ public class Supervisor extends AbstractActor {
     public List<ActorRef> instantiateSink(SinkNode node){
         layer ++;
         ActorRef actorRef =  getContext().actorOf(
-                SinkWorker.props(node.getSink(), lastLayerSize), "Sink");
+                SinkWorker.props(sink, lastLayerSize), "Sink");
         getContext().watch(actorRef);
         return Collections.singletonList(actorRef);
     }
@@ -157,8 +159,10 @@ public class Supervisor extends AbstractActor {
                 .match(Graph.class, g -> {
                     sender().tell("OK", self());
                     if(app == null) {
+                        this.sink = new Sink();
                         instantiate(g.getSourceNode());
-                        app = new App(source, g);
+                        app = new App(source, sink, g);
+                        sink = null;
                         app.init();
                     }
                 })
