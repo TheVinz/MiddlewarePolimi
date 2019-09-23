@@ -42,7 +42,6 @@ public class Point{
         }
 
         return  this;
-
     }
 
     public void dividePoint (Long value){
@@ -65,7 +64,6 @@ public class Point{
         double otherCoordinate;
 
         if (this.coordinates.size() == centroidCoordinates.size()) {
-
             for(int i=0; i<this.coordinates.size(); i++){
                 coordinate = this.coordinates.get(i);
                 otherCoordinate = centroidCoordinates.get(i);
@@ -77,7 +75,5 @@ public class Point{
         }
 
         return Math.sqrt(coordinatesSquareSum);
-
     }
-
 }

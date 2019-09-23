@@ -1,7 +1,6 @@
 package Kmeans_clustering_algorithm;
 
 import java.util.*;
-
 import static java.lang.Math.round;
 
 class Data {
@@ -9,7 +8,6 @@ class Data {
     private long dimension;
     private long numberOfPoints;
     private long numberOfCentroids;
-
     private Set<Point> points;
     private Set<Cluster> clusters;
 
@@ -42,7 +40,9 @@ class Data {
         return points;
     }
 
-    Set<Cluster> getClusters(){return  clusters; }
+    Set<Cluster> getClusters() {
+        return  clusters;
+    }
 
     void addPoint(Point point){
         this.points.add(point);
@@ -53,7 +53,7 @@ class Data {
         Vector<Double> minCoordinates = new Vector<>();
         Vector<Double> maxCoordinates = new Vector<>();
 
-        //Steps to create reasonable random centroid between the maximum and minimum values of the point
+        //Steps to subsequently create reasonable random centroid between the maximum and minimum values of the point
         for(int dim = 0; dim < dimension; dim++){
             minCoordinates.add(Double.MAX_VALUE);
             maxCoordinates.add(Double.MIN_VALUE);
@@ -82,7 +82,5 @@ class Data {
             this.clusters.add(new Cluster(i, coordinates));
             coordinates.clear();
         }
-
     }
-
 }

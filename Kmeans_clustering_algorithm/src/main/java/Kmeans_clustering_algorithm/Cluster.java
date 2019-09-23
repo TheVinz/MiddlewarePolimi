@@ -17,9 +17,11 @@ class Cluster {
     int getId() {
         return id;
     }
+
     Vector<Double> getCentroidCoordinates() {
         return centroidCoordinates;
     }
+
     Vector<Point> getPoints() {
         return points;
     }

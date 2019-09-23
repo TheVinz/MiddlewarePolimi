@@ -1,23 +1,4 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package Kmeans_clustering_algorithm;
-
 
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -34,21 +15,9 @@ import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.api.java.utils.RequiredParametersException;
 import org.apache.flink.configuration.Configuration;
 
-
 import java.io.*;
 import java.util.*;
 import java.util.zip.DataFormatException;
-
-/**
- * Skeleton for a Flink Batch Job.
- *
- * <p>For a tutorial how to write a Flink batch application, check the
- * tutorials and examples on the <a href="http://flink.apache.org/docs/stable/">Flink Website</a>.
- *
- * <p>To package your application into a JAR file for execution,
- * change the main class in the POM.xml file to this class (simply search for 'mainClass')
- * and run 'mvn clean package' on the command line.
- */
 
 public class BatchJob {
 
@@ -57,19 +26,20 @@ public class BatchJob {
 		final ParameterTool params = ParameterTool.fromArgs(args);
 		final String filename = params.get("filename", null);   //Path to the file with Data
 		final String output = params.get("output", null);   //Path to the output file for result
-		final int iterations = params.getInt("iterations", 0);  //Max iterations set by User
+		int iterations = params.getInt("iterations", 0);  //Max iterations set by User
 
 		if(filename == null) {
 			throw new RequiredParametersException
 					("Required parameter --filename with the path to the file with data");
 		}
 		if(output == null){
-		    System.out.println("If in a future you want to save your result and see the clusters add the parameter\n" +
-                    "--output with the path to the file on which you want the data to be printed");
+		    System.out.println("\nIf in a future you want to save your result and see the clusters add the parameter\n"
+					+ "--output with the path to the file on which you want the data to be printed");
         }
 		if(iterations == 0) {
-			throw new RequiredParametersException
-					("Required parameter --iterations with the number of iterations desired");
+			System.out.println("\nIf in a future you want to set the maximum value of iterations different from the "
+					+ "defatult value of '100' add the parameter\n" + "--iterations numberOfMaxIt");
+			iterations = 100;
 		}
 
 		Data data = new Data();
@@ -77,13 +47,13 @@ public class BatchJob {
         data.createCentroidsAndClusters(); //Creation of random Centroid and relatives clusters
 
 		final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
-		env.setRestartStrategy(RestartStrategies.fixedDelayRestart(10,5));
+		env.setRestartStrategy(RestartStrategies.fixedDelayRestart(24,5000));
 
 		DataSet<Point> points = env.fromCollection(data.getPoints());
-
 		DataSet<Cluster> clustersDataSet = env.fromCollection(data.getClusters());
 
-		IterativeDataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusterLoop = clustersDataSet.map(new ComputeTupleFromCluster()).iterate(iterations);
+		IterativeDataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusterLoop = clustersDataSet
+				.map(new ComputeTupleFromCluster()).iterate(iterations);
 
 		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> newClusters = clusterLoop
                 .map(new UpdateClusters())
@@ -97,18 +67,19 @@ public class BatchJob {
         DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> termination = clusterLoop
                 .filter(new OnlyChanged());
 
-		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> finalClusters = clusterLoop.closeWith(newClusters, termination);
+		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> finalClusters = clusterLoop
+				.closeWith(newClusters, termination);
 
-		DataSet<Cluster> result = finalClusters
+		List<Cluster> result = finalClusters
                 .sortPartition(0, Order.ASCENDING)
-                .map(new ComputeNewClusters());
+                .map(new ComputeNewClusters())
+				.collect();
 
 		printResult(result);
 
 		if(output != null){
-		    printResultOnOutput(result, output, points, clustersDataSet);
+		    printResultOnOutput(result, output, data.getPoints(), data.getClusters());
         }
-
 	}
 
 	private static void readData(Data data, String filename) throws DataFormatException{
@@ -116,19 +87,16 @@ public class BatchJob {
 		File file = new File(filename);
 
 		try (Scanner scan = new Scanner(file)) {
-
 			if (scan.hasNextLong()) {
 				data.setDimension(scan.nextLong());
 			} else {
 				throw new DataFormatException("File with not correct Data");
 			}
-
 			if (scan.hasNextLong()) {
 				data.setNumberOfPoints(scan.nextLong());
 			} else {
 				throw new DataFormatException("File with not correct Data");
 			}
-
 			if (scan.hasNextLong()) {
 				data.setNumberOfCentroids(scan.nextLong());
 			} else {
@@ -138,13 +106,10 @@ public class BatchJob {
 			int dimension = 0;
 			long numberOfPoints = 0;
 			Vector<Double> coordinate = new Vector<>();
-
 			String num;
 
 			while (scan.hasNext()) {
-
 				if (numberOfPoints < data.getNumberOfPoints()) {
-
 					num = scan.next();
 					coordinate.add(Double.valueOf(num));
 					dimension++;
@@ -160,23 +125,17 @@ public class BatchJob {
 					throw new DataFormatException("File with not correct Data: more point than expected");
 				}
 			}
-
 			if (numberOfPoints != data.getNumberOfPoints()) {
-				throw new DataFormatException("File with not correct Data: less point than expected\nnumberOfPoint: "
-						+ numberOfPoints + "\ndata.getNumberOfPoints: " + data.getNumberOfPoints());
+				throw new DataFormatException("File with not correct Data: less point than expected\n" +
+						"numberOfPoint: " + numberOfPoints + "\ndata.getNumberOfPoints: " + data.getNumberOfPoints());
 			}
-
 		} catch (IOException e) {
-
 			e.printStackTrace();
-
 		}
-
 	}
 
-	private static void printResult (DataSet<Cluster> result) throws Exception{
-
-        for(Cluster cluster : result.collect()){
+	private static void printResult (List<Cluster> result) {
+		for(Cluster cluster : result){
             System.out.println(
                     "\nCluster id: " + cluster.getId() +
                     "\nCentroid: " + cluster.getCentroidCoordinates() +
@@ -185,25 +144,26 @@ public class BatchJob {
         System.out.println("\n");
     }
 
-    private static void printResultOnOutput (DataSet<Cluster> result, String output, DataSet<Point> points, DataSet<Cluster> initialClusters) throws Exception{
+    private static void printResultOnOutput
+			(List<Cluster> result, String output, Set<Point> points, Set<Cluster> initialClusters) throws Exception{
 
 	    FileWriter fw = new FileWriter(output);
         BufferedWriter bw = new BufferedWriter(fw);
         PrintWriter out = new PrintWriter(bw);
 
         out.println("Points:");
-        for(Point point : points.collect()){
+        for(Point point : points){
             out.println(" " + point.getCoordinates());
         }
 
         out.println("\nRandom Centroids:");
-        for(Cluster cluster : initialClusters.collect()){
+        for(Cluster cluster : initialClusters){
             out.println(" " + cluster.getCentroidCoordinates());
         }
 
         out.println("\n\n========= RESULTS =========");
         out.println("\nFinal Clusters");
-        for(Cluster cluster : result.collect()){
+        for(Cluster cluster : result){
             out.println("\nCluster id: " + cluster.getId());
             out.println("Centroid: " + cluster.getCentroidCoordinates());
             out.println("Number of points: " + cluster.getPoints().size());
@@ -212,13 +172,14 @@ public class BatchJob {
                 out.println(" " + point.getCoordinates());
             }
         }
-
         out.close();
         bw.close();
         fw.close();
     }
 
-	public static final class FindNearestCentroid extends RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>> {
+	public static final class FindNearestCentroid extends
+			RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>> {
+
 		private Collection<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusters;
 
 		@Override
@@ -248,34 +209,39 @@ public class BatchJob {
 		}
 	}
 
-	public static final class SumCoordinatesAndPoints implements ReduceFunction <Tuple4<Integer, Point, Vector<Point>, Long>> {
+	public static final class SumCoordinatesAndPoints implements
+			ReduceFunction <Tuple4<Integer, Point, Vector<Point>, Long>> {
 		@Override
-		public Tuple4<Integer, Point, Vector<Point>, Long> reduce(Tuple4<Integer, Point, Vector<Point>, Long> data1, Tuple4<Integer, Point, Vector<Point>, Long> data2) throws Exception {
-            data1.f2.addAll(data2.f2);
+		public Tuple4<Integer, Point, Vector<Point>, Long>
+		reduce(Tuple4<Integer, Point, Vector<Point>, Long> data1, Tuple4<Integer, Point, Vector<Point>, Long> data2)
+				throws Exception {
+			data1.f2.addAll(data2.f2);
 		    data1.f3 += data2.f3;
 		    return new Tuple4<>(data1.f0, data1.f1.sumPoint(data2.f1), data1.f2, data1.f3);
 		}
 	}
 
-	public static final class AverageCoordinates implements  MapFunction<Tuple4<Integer, Point, Vector<Point>, Long>, Tuple3<Integer, Point, Vector<Point>>>{
-	    @Override
+	public static final class AverageCoordinates implements
+			MapFunction<Tuple4<Integer, Point, Vector<Point>, Long>, Tuple3<Integer, Point, Vector<Point>>>{
+		@Override
         public Tuple3<Integer, Point, Vector<Point>> map(Tuple4<Integer, Point, Vector<Point>, Long> value) {
             value.f1.dividePoint(value.f3);
 	        return new Tuple3<>(value.f0, value.f1, value.f2);
         }
     }
 
-	public static final class ComputeNewClusters implements MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>{
+	public static final class ComputeNewClusters implements
+			MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>{
 	    @Override
-        public Cluster map(Tuple4<Integer, Point, Boolean, Vector<Point>> value)    {
+        public Cluster map(Tuple4<Integer, Point, Boolean, Vector<Point>> value) {
 	        Cluster cluster = new Cluster(value.f0, value.f1.getCoordinates());
 	        cluster.setPoints(value.f3);
 	        return cluster;
 	    }
 	}
 
-
-	public static final class UpdateClusters extends   RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
+	public static final class UpdateClusters extends
+			RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
 
 		private Collection<Tuple3<Integer, Point, Vector<Point>>> clusters;
 
@@ -285,7 +251,8 @@ public class BatchJob {
 		}
 
 		@Override
-		public Tuple4<Integer, Point, Boolean, Vector<Point>> map(Tuple4<Integer, Point, Boolean, Vector<Point>> clusterToUpdate) {
+		public Tuple4<Integer, Point, Boolean, Vector<Point>> map
+				(Tuple4<Integer, Point, Boolean, Vector<Point>> clusterToUpdate) {
 
 			for(Tuple3<Integer, Point, Vector<Point>> cluster : clusters){
 				if(clusterToUpdate.f0.equals(cluster.f0)) {
@@ -297,24 +264,23 @@ public class BatchJob {
 					}
 				}
 			}
-
 			return new Tuple4<>(clusterToUpdate.f0, clusterToUpdate.f1, false, clusterToUpdate.f3);
 		}
 	}
 
-	public static final class ComputeTupleFromCluster implements MapFunction<Cluster, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
+	public static final class ComputeTupleFromCluster implements
+			MapFunction<Cluster, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
 		@Override
 		public Tuple4<Integer, Point, Boolean, Vector<Point>> map(Cluster cluster) {
 			return new Tuple4<>(cluster.getId(), new Point(cluster.getCentroidCoordinates()), true, cluster.getPoints());
 		}
 	}
 
-	public static final class OnlyChanged implements FilterFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>>{
+	public static final class OnlyChanged implements
+			FilterFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>>{
         @Override
         public boolean filter(Tuple4<Integer, Point, Boolean, Vector<Point>> value){
             return value.f2;
         }
     }
-
-
 }
