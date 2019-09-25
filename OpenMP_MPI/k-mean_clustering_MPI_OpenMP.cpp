@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <mpi.h>
 #include <omp.h>
+#include <fstream> 
 
 #define MAX_K 500
 #define MAX_N 10000
@@ -48,19 +49,28 @@ double point_dist(point a, point b){
 
 int main(int argc, char* argv[]){
     int k, n, m, rank, size, root=0;
-    double time_start=cpuSecond(), time_end;
+    double time_start, time_end;
     set<point> clusters[MAX_K];
     point points[MAX_N], centroids[MAX_K];
+
+
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    ifstream file;
+
+    if(argc > 0)
+        file.open(argv[1]);
+    else 
+        file.open("points-generated.txt"); 
+
     if(rank==root){
-        cin >> k;
-        cin >> n;
-        cin >> m;
+        file >> k;
+        file >> n;
+        file >> m;
     }
 
     MPI_Bcast(&k, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -86,7 +96,7 @@ int main(int argc, char* argv[]){
             point p(m);
             for(int j=0; j<m; j++){
                 double in;
-                cin >> in;
+                file >> in;
                 p.at(j) = in;
                 if(in > max.at(j))
                     max.at(j)=in;
@@ -111,6 +121,8 @@ int main(int argc, char* argv[]){
             centroids[i]=centroid;
         }
 
+        file.close();
+
     } else{
         MPI_Status status;
         for(int i=0; i<num_points; i++){
@@ -120,6 +132,8 @@ int main(int argc, char* argv[]){
     }
 
     bool same_centroids=false;
+
+    time_start = cpuSecond();
 
     while(!same_centroids){
         same_centroids=true;
@@ -216,12 +230,14 @@ int main(int argc, char* argv[]){
 
     if(rank==root){
 
+
+        time_end=cpuSecond();
+
         for(int i=0; i<k; i++){
             printf ("%d.  ", i+1);
             print_point(centroids[i]);
         }
 
-        time_end=cpuSecond();
         cout << "Time: "<<time_end-time_start<<endl;
     }
 }
