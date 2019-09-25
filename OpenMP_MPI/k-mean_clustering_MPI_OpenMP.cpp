@@ -183,9 +183,6 @@ int main(int argc, char* argv[]){
             local_clusters_size[i]=clusters[i].size();
         }
 
-        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
-        MPI_Bcast(global_clusters_size, k, MPI_INT, root, MPI_COMM_WORLD);
-
         point local_new_centroids[MAX_K], global_new_centroids[MAX_K];
 
         #pragma omp parallel for
@@ -196,7 +193,7 @@ int main(int argc, char* argv[]){
                     double new_coord=0;
                     for(set<point>::iterator it=clusters[cenIt].begin(); it!=clusters[cenIt].end(); ++it){
                         point p=*it;
-                        new_coord+=p.at(dim)/global_clusters_size[cenIt];
+                        new_coord+=p.at(dim);
                     }
                     new_centroid.at(dim)=new_coord;
                 }
@@ -204,6 +201,15 @@ int main(int argc, char* argv[]){
             }
             else{
                 local_new_centroids[cenIt]=point(m,0);
+            }
+        }
+
+        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
+        MPI_Bcast(global_clusters_size, k, MPI_INT, root, MPI_COMM_WORLD);
+
+        for(int centroidIt = 0; centroidIt<k; centroidIt++){
+            for(int coord = 0; coord < m; coord ++){
+                local_new_centroids[centroidIt].at(coord) /= global_clusters_size[centroidIt];
             }
         }
 
