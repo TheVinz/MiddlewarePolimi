@@ -4,26 +4,7 @@
     <list default="true" id="331aedd5-1fe7-4197-9286-fae6e4c82e89" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Result.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Result.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/BatchJob.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/BatchJob.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Cluster.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Cluster.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Data.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Data.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Point.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Kmeans_clustering_algorithm/Point.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/K-means_clustering_algorithm-1.0-SNAPSHOT.jar" beforeDir="false" afterPath="$PROJECT_DIR$/target/K-means_clustering_algorithm-1.0-SNAPSHOT.jar" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$AverageCoordinates.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$AverageCoordinates.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$ComputeNewClusters.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$ComputeNewClusters.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$ComputeTupleFromCluster.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$ComputeTupleFromCluster.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$FindNearestCentroid.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$FindNearestCentroid.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$OnlyChanged.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$OnlyChanged.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$SumCoordinatesAndPoints.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$SumCoordinatesAndPoints.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$UpdateClusters.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob$UpdateClusters.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/BatchJob.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Cluster.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Cluster.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Data.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Data.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Point.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/Kmeans_clustering_algorithm/Point.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/maven-archiver/pom.properties" beforeDir="false" afterPath="$PROJECT_DIR$/target/maven-archiver/pom.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/original-K-means_clustering_algorithm-1.0-SNAPSHOT.jar" beforeDir="false" afterPath="$PROJECT_DIR$/target/original-K-means_clustering_algorithm-1.0-SNAPSHOT.jar" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -90,7 +71,7 @@
     <property name="GenerateAntBuildDialog.forceTargetJdk" value="true" />
     <property name="GenerateAntBuildDialog.outputFileNameProperty" value="kmeans_clustering_algorithm" />
     <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1566826518806" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../Kmeans_clustering_algorithm" />
     <property name="project.structure.last.edited" value="Modules" />
     <property name="project.structure.proportion" value="0.0" />
     <property name="project.structure.side.proportion" value="0.0" />

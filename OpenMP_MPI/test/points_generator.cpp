@@ -27,6 +27,8 @@ int main(int argc, char* argv[]){
     gettimeofday(&tp, NULL);
     long seed = ((double)tp.tv_sec+(double)tp.tv_usec*1.e-6);
 
+    srand48();
+
     for(int i=0; i<n; i++){
         for(int j=0; j<m; j++){
             File << drand48()*1000 << "  ";

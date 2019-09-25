@@ -6,6 +6,8 @@ import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.IterativeDataSet;
@@ -53,26 +55,33 @@ public class BatchJob {
 		DataSet<Cluster> clustersDataSet = env.fromCollection(data.getClusters());
 
 		IterativeDataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusterLoop = clustersDataSet
-				.map(new ComputeTupleFromCluster()).iterate(iterations);
+				.map(computeTupleFromCluster)
+				.returns(TypeInformation.of(new TypeHint<Tuple4<Integer, Point, Boolean, Vector<Point>>>() {}))
+				.iterate(iterations);
 
 		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> newClusters = clusterLoop
-                .map(new UpdateClusters())
+                .map(updateClusters)
+				.returns(TypeInformation.of(new TypeHint<Tuple4<Integer, Point, Boolean, Vector<Point>>>() {}))
                 .withBroadcastSet(
                         points
-                        .map(new FindNearestCentroid()).withBroadcastSet(clusterLoop, "clusters")
+                        .map(findNearestCentroid).withBroadcastSet(clusterLoop, "clusters")
+						.returns(TypeInformation.of(new TypeHint<Tuple4<Integer, Point, Vector<Point>, Long>>() {}))
                         .groupBy(0)
-                                .reduce(new SumCoordinatesAndPoints())
-                                .map(new AverageCoordinates()), "clusters");
+                                .reduce(sumCoordinatesAndPoints)
+                                .map(averageCoordinates)
+								.returns(TypeInformation.of(new TypeHint<Tuple3<Integer, Point, Vector<Point>>>() {})),
+						"clusters");
 
         DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> termination = clusterLoop
-                .filter(new OnlyChanged());
+                .filter(onlyChanged);
 
 		DataSet<Tuple4<Integer, Point, Boolean, Vector<Point>>> finalClusters = clusterLoop
 				.closeWith(newClusters, termination);
 
 		List<Cluster> result = finalClusters
                 .sortPartition(0, Order.ASCENDING)
-                .map(new ComputeNewClusters())
+                .map(computeNewClusters)
+				.returns(TypeInformation.of(new TypeHint<Cluster>() {}))
 				.collect();
 
 		printResult(result);
@@ -177,110 +186,97 @@ public class BatchJob {
         fw.close();
     }
 
-	public static final class FindNearestCentroid extends
-			RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>> {
 
-		private Collection<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusters;
+    private static final RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>> findNearestCentroid =
+			new RichMapFunction<Point, Tuple4<Integer, Point, Vector<Point>, Long>>(){
+				private Collection<Tuple4<Integer, Point, Boolean, Vector<Point>>> clusters;
 
-		@Override
-		public void open(Configuration parameters) {
-			this.clusters = getRuntimeContext().getBroadcastVariable("clusters");
-		}
-
-		@Override
-		public Tuple4<Integer, Point, Vector<Point>, Long> map(Point point) throws Exception {
-			int idClosest = -1;
-			double minDistance = Double.MAX_VALUE;
-
-			for (Tuple4<Integer, Point, Boolean, Vector<Point>> cluster : clusters) {
-				double distance = point.distanceFromCentroid(cluster.f1.getCoordinates());
-				if (distance < minDistance) {
-					minDistance = distance;
-					idClosest = cluster.f0;
+				@Override
+				public void open(Configuration parameters) {
+					this.clusters = getRuntimeContext().getBroadcastVariable("clusters");
 				}
-			}
 
-			if(idClosest == -1) throw new DataFormatException("Not found a centroid for a point, impossible situation");
+				@Override
+				public Tuple4<Integer, Point, Vector<Point>, Long> map(Point point) throws Exception {
+					int idClosest = -1;
+					double minDistance = Double.MAX_VALUE;
 
-			Vector<Point> pointVector = new Vector<>();
-			pointVector.add(point);
-
-			return new Tuple4<>(idClosest, point, pointVector, 1L);
-		}
-	}
-
-	public static final class SumCoordinatesAndPoints implements
-			ReduceFunction <Tuple4<Integer, Point, Vector<Point>, Long>> {
-		@Override
-		public Tuple4<Integer, Point, Vector<Point>, Long>
-		reduce(Tuple4<Integer, Point, Vector<Point>, Long> data1, Tuple4<Integer, Point, Vector<Point>, Long> data2)
-				throws Exception {
-			data1.f2.addAll(data2.f2);
-		    data1.f3 += data2.f3;
-		    return new Tuple4<>(data1.f0, data1.f1.sumPoint(data2.f1), data1.f2, data1.f3);
-		}
-	}
-
-	public static final class AverageCoordinates implements
-			MapFunction<Tuple4<Integer, Point, Vector<Point>, Long>, Tuple3<Integer, Point, Vector<Point>>>{
-		@Override
-        public Tuple3<Integer, Point, Vector<Point>> map(Tuple4<Integer, Point, Vector<Point>, Long> value) {
-            value.f1.dividePoint(value.f3);
-	        return new Tuple3<>(value.f0, value.f1, value.f2);
-        }
-    }
-
-	public static final class ComputeNewClusters implements
-			MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>{
-	    @Override
-        public Cluster map(Tuple4<Integer, Point, Boolean, Vector<Point>> value) {
-	        Cluster cluster = new Cluster(value.f0, value.f1.getCoordinates());
-	        cluster.setPoints(value.f3);
-	        return cluster;
-	    }
-	}
-
-	public static final class UpdateClusters extends
-			RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
-
-		private Collection<Tuple3<Integer, Point, Vector<Point>>> clusters;
-
-		@Override
-		public void open(Configuration parameters) {
-			this.clusters = getRuntimeContext().getBroadcastVariable("clusters");
-		}
-
-		@Override
-		public Tuple4<Integer, Point, Boolean, Vector<Point>> map
-				(Tuple4<Integer, Point, Boolean, Vector<Point>> clusterToUpdate) {
-
-			for(Tuple3<Integer, Point, Vector<Point>> cluster : clusters){
-				if(clusterToUpdate.f0.equals(cluster.f0)) {
-					if (clusterToUpdate.f1.getCoordinates().equals(cluster.f1.getCoordinates())
-							&& clusterToUpdate.f3.size() == cluster.f2.size()) {
-						return new Tuple4<>(cluster.f0, cluster.f1, false, cluster.f2);
-					} else {
-						return new Tuple4<>(cluster.f0, cluster.f1, true, cluster.f2);
+					for (Tuple4<Integer, Point, Boolean, Vector<Point>> cluster : clusters) {
+						double distance = point.distanceFromCentroid(cluster.f1.getCoordinates());
+						if (distance < minDistance) {
+							minDistance = distance;
+							idClosest = cluster.f0;
+						}
 					}
+
+					if(idClosest == -1) throw new DataFormatException("Not found a centroid for a point, impossible situation");
+
+					Vector<Point> pointVector = new Vector<>();
+					pointVector.add(point);
+
+					return new Tuple4<>(idClosest, point, pointVector, 1L);
 				}
-			}
-			return new Tuple4<>(clusterToUpdate.f0, clusterToUpdate.f1, false, clusterToUpdate.f3);
-		}
-	}
+			};
 
-	public static final class ComputeTupleFromCluster implements
-			MapFunction<Cluster, Tuple4<Integer, Point, Boolean, Vector<Point>>>{
-		@Override
-		public Tuple4<Integer, Point, Boolean, Vector<Point>> map(Cluster cluster) {
-			return new Tuple4<>(cluster.getId(), new Point(cluster.getCentroidCoordinates()), true, cluster.getPoints());
-		}
-	}
 
-	public static final class OnlyChanged implements
-			FilterFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>>{
-        @Override
-        public boolean filter(Tuple4<Integer, Point, Boolean, Vector<Point>> value){
-            return value.f2;
-        }
-    }
+	private static final ReduceFunction<Tuple4<Integer, Point, Vector<Point>, Long>> sumCoordinatesAndPoints =
+			(ReduceFunction<Tuple4<Integer, Point, Vector<Point>, Long>>) (data1, data2) -> {
+				data1.f2.addAll(data2.f2);
+				data1.f3 += data2.f3;
+				return new Tuple4<>(data1.f0, data1.f1.sumPoint(data2.f1), data1.f2, data1.f3);
+			};
+
+	private static final MapFunction<Tuple4<Integer, Point, Vector<Point>, Long>, Tuple3<Integer, Point, Vector<Point>>>
+		averageCoordinates =
+			(MapFunction<Tuple4<Integer, Point, Vector<Point>, Long>, Tuple3<Integer, Point, Vector<Point>>>) value -> {
+				value.f1.dividePoint(value.f3);
+				return new Tuple3<>(value.f0, value.f1, value.f2);
+			};
+
+	private static final MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster> computeNewClusters =
+			(MapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Cluster>) value -> {
+				Cluster cluster = new Cluster(value.f0, value.f1.getCoordinates());
+				cluster.setPoints(value.f3);
+				return cluster;
+			};
+
+	private static final RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>>
+		updateClusters =
+			new RichMapFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>, Tuple4<Integer, Point, Boolean, Vector<Point>>> (){
+
+				private Collection<Tuple3<Integer, Point, Vector<Point>>> clusters;
+
+				@Override
+				public void open(Configuration parameters) {
+					this.clusters = getRuntimeContext().getBroadcastVariable("clusters");
+				}
+
+				@Override
+				public Tuple4<Integer, Point, Boolean, Vector<Point>> map
+						(Tuple4<Integer, Point, Boolean, Vector<Point>> clusterToUpdate) {
+
+					for(Tuple3<Integer, Point, Vector<Point>> cluster : clusters){
+						if(clusterToUpdate.f0.equals(cluster.f0)) {
+							if (clusterToUpdate.f1.getCoordinates().equals(cluster.f1.getCoordinates())
+									&& clusterToUpdate.f3.size() == cluster.f2.size()) {
+								return new Tuple4<>(cluster.f0, cluster.f1, false, cluster.f2);
+							} else {
+								return new Tuple4<>(cluster.f0, cluster.f1, true, cluster.f2);
+							}
+						}
+					}
+					return new Tuple4<>(clusterToUpdate.f0, clusterToUpdate.f1, false, clusterToUpdate.f3);
+				}
+			};
+
+	private static final MapFunction<Cluster, Tuple4<Integer, Point, Boolean, Vector<Point>>> computeTupleFromCluster =
+			(MapFunction<Cluster, Tuple4<Integer, Point, Boolean, Vector<Point>>>) cluster -> {
+				int id = cluster.getId();
+				Point centroid = new Point(cluster.getCentroidCoordinates());
+				Vector<Point> points = cluster.getPoints();
+				return new Tuple4<>(id, centroid, true, points);
+			};
+
+	private static final FilterFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>> onlyChanged =
+			(FilterFunction<Tuple4<Integer, Point, Boolean, Vector<Point>>>) value -> value.f2;
 }

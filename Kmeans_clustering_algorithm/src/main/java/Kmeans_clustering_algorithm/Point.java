@@ -36,11 +36,9 @@ public class Point{
 
             this.setCoordinates(newCoordinates);
 
-        }
-        else{
+        } else{
             throw new DataFormatException("Addition of two points: the dimension of the two points is not the same");
         }
-
         return  this;
     }
 
@@ -69,11 +67,9 @@ public class Point{
                 otherCoordinate = centroidCoordinates.get(i);
                 coordinatesSquareSum += (coordinate - otherCoordinate) * (coordinate - otherCoordinate);
             }
-        }
-        else{
+        } else{
             throw new DataFormatException("Distance of two points: the dimension of the two points is not the same");
         }
-
         return Math.sqrt(coordinatesSquareSum);
     }
 }
