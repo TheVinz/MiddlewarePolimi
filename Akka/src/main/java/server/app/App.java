@@ -30,7 +30,7 @@ public class App {
 
     public void init() {
         Server server;
-        try(BufferedReader reader = new BufferedReader(new FileReader(new File("conf/commonconf/server.json")))){
+        try(BufferedReader reader = new BufferedReader(new FileReader(new File("conf/commonconf/server.conf")))){
             String line = reader.readLine();
             server = gson.fromJson(line, Server.class);
         } catch (IOException e) {

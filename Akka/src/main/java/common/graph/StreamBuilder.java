@@ -148,11 +148,11 @@ public class StreamBuilder {
     public void create() {
         Server server;
         if(complete){
-            try(BufferedReader reader = new BufferedReader(new FileReader(new File("conf/commonconf/server.json")))){
+            try(BufferedReader reader = new BufferedReader(new FileReader(new File("conf/commonconf/server.conf")))){
                 String line = reader.readLine();
                 server = (new Gson()).fromJson(line, Server.class);
             } catch (FileNotFoundException e) {
-                System.err.println("File server.json not found in conf/commonconf directory.");
+                System.err.println("File server.conf not found in conf/commonconf directory.");
                 return;
             } catch (IOException e) {
                 e.printStackTrace();
