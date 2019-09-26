@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <mpi.h>
 #include <omp.h>
+#include <fstream> 
 
 #define MAX_K 500
 #define MAX_N 10000
@@ -48,19 +49,28 @@ double point_dist(point a, point b){
 
 int main(int argc, char* argv[]){
     int k, n, m, rank, size, root=0;
-    double time_start=cpuSecond(), time_end;
+    double time_start, time_end;
     set<point> clusters[MAX_K];
     point points[MAX_N], centroids[MAX_K];
+
+
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    ifstream file;
+
+    if(argc > 0)
+        file.open(argv[1]);
+    else 
+        file.open("points-generated.txt"); 
+
     if(rank==root){
-        cin >> k;
-        cin >> n;
-        cin >> m;
+        file >> k;
+        file >> n;
+        file >> m;
     }
 
     MPI_Bcast(&k, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -86,7 +96,7 @@ int main(int argc, char* argv[]){
             point p(m);
             for(int j=0; j<m; j++){
                 double in;
-                cin >> in;
+                file >> in;
                 p.at(j) = in;
                 if(in > max.at(j))
                     max.at(j)=in;
@@ -111,6 +121,8 @@ int main(int argc, char* argv[]){
             centroids[i]=centroid;
         }
 
+        file.close();
+
     } else{
         MPI_Status status;
         for(int i=0; i<num_points; i++){
@@ -120,6 +132,8 @@ int main(int argc, char* argv[]){
     }
 
     bool same_centroids=false;
+
+    time_start = cpuSecond();
 
     while(!same_centroids){
         same_centroids=true;
@@ -169,9 +183,6 @@ int main(int argc, char* argv[]){
             local_clusters_size[i]=clusters[i].size();
         }
 
-        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
-        MPI_Bcast(global_clusters_size, k, MPI_INT, root, MPI_COMM_WORLD);
-
         point local_new_centroids[MAX_K], global_new_centroids[MAX_K];
 
         #pragma omp parallel for
@@ -182,7 +193,7 @@ int main(int argc, char* argv[]){
                     double new_coord=0;
                     for(set<point>::iterator it=clusters[cenIt].begin(); it!=clusters[cenIt].end(); ++it){
                         point p=*it;
-                        new_coord+=p.at(dim)/global_clusters_size[cenIt];
+                        new_coord+=p.at(dim);
                     }
                     new_centroid.at(dim)=new_coord;
                 }
@@ -190,6 +201,16 @@ int main(int argc, char* argv[]){
             }
             else{
                 local_new_centroids[cenIt]=point(m,0);
+            }
+        }
+
+        MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
+        MPI_Bcast(global_clusters_size, k, MPI_INT, root, MPI_COMM_WORLD);
+
+        #pragma omp parallel for
+        for(int centroidIt = 0; centroidIt<k; centroidIt++){
+            for(int coord = 0; coord < m; coord ++){
+                local_new_centroids[centroidIt].at(coord) /= global_clusters_size[centroidIt];
             }
         }
 
@@ -216,12 +237,14 @@ int main(int argc, char* argv[]){
 
     if(rank==root){
 
+
+        time_end=cpuSecond();
+
         for(int i=0; i<k; i++){
             printf ("%d.  ", i+1);
             print_point(centroids[i]);
         }
 
-        time_end=cpuSecond();
         cout << "Time: "<<time_end-time_start<<endl;
     }
 }
