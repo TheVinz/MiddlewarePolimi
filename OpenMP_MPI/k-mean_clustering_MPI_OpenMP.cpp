@@ -207,6 +207,7 @@ int main(int argc, char* argv[]){
         MPI_Reduce(local_clusters_size, global_clusters_size, k, MPI_INT, MPI_SUM, root, MPI_COMM_WORLD);
         MPI_Bcast(global_clusters_size, k, MPI_INT, root, MPI_COMM_WORLD);
 
+        #pragma omp parallel for
         for(int centroidIt = 0; centroidIt<k; centroidIt++){
             for(int coord = 0; coord < m; coord ++){
                 local_new_centroids[centroidIt].at(coord) /= global_clusters_size[centroidIt];
